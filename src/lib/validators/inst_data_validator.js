@@ -14,7 +14,7 @@ function HALT_VALIDATOR(data = []) {
 }
 
 /**
- * @param {(string | number)[]} data
+ * @param {(string)[]} data
  * @returns {boolean}
  */
 function DELAY_VALIDATOR(data = []) {
@@ -25,11 +25,14 @@ function DELAY_VALIDATOR(data = []) {
     /** @type {number} */
     let delay
 
-    // if data is not a number, it is assumed to be a string containing
-    // a number and a unit of time (e.g. '1s', '1ms', '10m')
-    // so we need to extract the number from the string using a regex
-    if (typeof data[0] === 'string') {
-        const match = data[0].match(/^(\d+)([^\d\s]+?)$/i)
+    // if data is a number, it is assumed to be the delay in seconds
+    if (data[0].match(/^\d+$/) !== null) {
+        delay = parseInt(data[0])
+    } else {
+        // if data is not a number, it is assumed to be a string containing
+        // a number and a unit of time (e.g. '1s', '1ms', '10m')
+        // so we need to extract the number from the string using a regex
+        const match = data[0].match(/^(\d+?(?:\.\d+?)?)([^\d\s]{1,2})$/i)
         if (match === null) {
             return false
         }
@@ -38,10 +41,8 @@ function DELAY_VALIDATOR(data = []) {
         if (!['ms', 's', 'm', 'h'].includes(match[2].toLocaleLowerCase())) {
             return false
         }
-
-        delay = parseInt(match[1])
-    } else {
-        delay = data[0]
+    
+        delay = parseFloat(match[1])
     }
 
     return delay > 0
