@@ -1,0 +1,20 @@
+{
+  "name": "execubits",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "OVECJOE <https://linkedin.com/in/victorohachor>",
+  "license": "MIT",
+  "description": "A command-line interface (CLI) tool that automates the playback behavior of .wav audio files using .ebits files. These .ebits files contain sequences of binary instructions (0s and 1s) that define specific actions and timing for controlling audio playback.",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0"
+  }
+}

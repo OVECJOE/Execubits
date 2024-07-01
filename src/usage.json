@@ -1,0 +1,24 @@
+[
+    {
+        "name": "audio-file",
+        "examples": [
+            ["-a", "<audio[.wav]>"],
+            ["--audio-file", "<audio[.wav]>"]
+        ],
+        "description": "If no extension is provided, defaults to .wav. The audio file to be played.",
+        "type": "string",
+        "required": false,
+        "side_note": "Only .wav files are supported at the moment."
+    },
+    {
+        "name": "watch-mode",
+        "examples": [
+            ["-w", "none|script|audio"],
+            ["--watch-mode", "none|script|audio"]
+        ],
+        "description": "Defaults to none. The mode to watch for changes in the script or audio file.",
+        "type": "string",
+        "required": false,
+        "side_note": "If audio file is not provided, 'audio' does nothing."
+    }
+]
