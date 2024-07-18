@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises'
-import os from 'node:os'
+import os, { type } from 'node:os'
 import EventEmitter from 'node:events'
 import { showErrMsgAndExit } from '../utils.js'
 import { INSTRUCTION_MAPPINGS } from '../constants.js'
 import { depsValidator, dataValidator } from './validators/index.js'
 
-class EbitsParser {
+class EbitsParser extends EventEmitter {
     /**
      * @description: The handler will store the file descriptor of the script file.
      * @type {fs.FileHandle | null}
@@ -15,12 +15,12 @@ class EbitsParser {
     #handler = null
 
     /**
-     * @description: The scriptSize will store the size of the script file.
-     * @type {number}
+     * @description: The script path will store the path to the script file.
+     * @type {string}
      * 
      * @private
      */
-    #scriptSize = 0
+    #scriptFile = ''
     
     /**
      * @description: The instructions array will store the parsed instructions from the script file.
@@ -31,52 +31,86 @@ class EbitsParser {
     #instructions = []
 
     /**
-     * @param {string} scriptPath The path to the script file.
-     * @param {function} callback The callback function to execute after parsing the script file.
+     * @description: Supported events for the parser.
+     * @type {Record<string, (arg?: string) => Promise<void> | null>}
      * 
+     * @private
+     */
+    #events = {
+        ON_TOKENISATION_START: this.#tokenise.bind(this),
+        ON_PARSING_START: this.#parse.bind(this),
+        ON_TOKENISATION_END: null,
+        ON_PARSING_END: null,
+    }
+
+    /**
+     * @param {string} path The path to the script file.
+     * @param {Record<'ON_TOKENISATION_END' | 'ON_PARSING_END', (arg?: string) => Promise<void>>} listeners The event listeners for the parser.
      * @constructor
      */
-    constructor(scriptPath, callback = async () => {}) {
-        if (typeof scriptPath !== 'string') {
+    constructor(path, listeners) {
+        super({ captureRejections: true })
+
+        if (typeof path !== 'string') {
             showErrMsgAndExit('ERROR: The script path should be a string')
         }
 
-        /** @type {EventEmitter} */
-        this.parserEmitter = new EventEmitter()
-
-        fs.open(scriptPath, 'r').then((descriptor) => {
-            this.#handler = descriptor
-
-            // get the file size
-            this.#handler.stat().then((stats) => {
-                // Check if the script path points to a file
-                if (!stats.isFile()) {
-                    showErrMsgAndExit('ERROR: The script path should point to a file')
+        // Register the events
+        for (const [event, listener] of Object.entries(this.#events)) {
+            if ([ 'ON_TOKENISATION_END', 'ON_PARSING_END' ].includes(event)) {
+                if (typeof listeners !== 'object' || typeof listeners[event] !== 'function') {
+                    showErrMsgAndExit(`ERROR: The listener for event ${event} should be a function`)
                 }
 
-                // Check if the file is empty
-                if (stats.size === 0) {
-                    showErrMsgAndExit('ERROR: The script file is empty')
+                if (typeof listeners === 'object' && typeof listeners[event] === 'function') {
+                    this.once(event, listeners[event])
                 }
 
-                this.#scriptSize = stats.size
-                this.#tokenise().then(() => {
-                    this.parserEmitter.on('on-parse-complete', callback)
-                    this.#parse()
-                }) // start tokenising the script
-            })
-        })
-    }
+                continue
+            }
 
-    get instructions() {
-        return this.#instructions
+            this.once(event, listener)
+        }
+
+        this.#scriptFile = path
     }
 
     get dependencies() {
         return this.#instructions.map(inst => INSTRUCTION_MAPPINGS.get(inst.code).dependencies)
     }
 
-    async #tokenise() {
+    get instructions() {
+        return this.#instructions
+    }
+
+    /**
+     * @param {string} path The path to the script file.
+     * @returns {Promise<void>}
+     */
+    async init(path) {
+        try {
+            // Open the script file in read mode
+            this.#handler = await fs.open(path, 'r')
+
+            // get the file size
+            const stats = await this.#handler.stat()
+            if (!stats.isFile()) {
+                showErrMsgAndExit('ERROR: The script path should point to a file')
+            }
+
+            if (stats.size === 0) {
+                showErrMsgAndExit('ERROR: The script file is empty')
+            }
+
+            // Start the tokenisation process
+            this.emit('ON_TOKENISATION_START', stats.size)
+        } catch (error) {
+            showErrMsgAndExit('ERROR: The script file does not exist')
+        }
+
+    }
+
+    async #tokenise(scriptSize = 0) {
         const buffer = Buffer.alloc(1)
         let position = 0
         const tracker = {
@@ -85,7 +119,7 @@ class EbitsParser {
             data: [],
         }
 
-        while (position < this.#scriptSize) {
+        while (position < scriptSize) {
             await this.#handler.read(buffer, 0, buffer.byteLength, position)
             const char = buffer.toString('utf8', 0, 1);
 
@@ -99,7 +133,7 @@ class EbitsParser {
                 // Handle \r\n case on Windows
                 position += os.EOL.length - char.length
             } else if (/\s+?/.test(char)) {
-                if (!tracker.code && position !== this.#scriptSize - 1) {
+                if (!tracker.code && position !== scriptSize - 1) {
                     showErrMsgAndExit(`ERROR: Invalid instruction at line ${tracker.line}`)
                 }
     
@@ -124,12 +158,16 @@ class EbitsParser {
             this.#instructions.push({ ...tracker })
         }
 
-        this.#handler.close()
+        // Begin the parsing process
+        this.emit('ON_PARSING_START')
     }
 
     async #parse() {
+        // Notify about the end of tokenisation process
+        this.emit('ON_TOKENISATION_END')
+
         let parsedInstCnt = 0
-        for (const inst of this.instructions) {
+        for (const inst of this.#instructions) {
             if (!INSTRUCTION_MAPPINGS.has(inst.code)) {
                 showErrMsgAndExit(`ERROR: Invalid instruction at line ${inst.line}`)
             }
@@ -143,7 +181,7 @@ class EbitsParser {
             }
 
             // validate that the instruction was used correctly (i.e. dependencies are met)
-            if (!depsValidator(this.instructions.slice(0, parsedInstCnt), inst)) {
+            if (!depsValidator(this.#instructions.slice(0, parsedInstCnt), inst)) {
                 showErrMsgAndExit(`ERROR: Invalid instruction at line ${inst.line}`)
             }
 
@@ -155,8 +193,8 @@ class EbitsParser {
             parsedInstCnt++
         }
 
-        // emit the parse complete event
-        this.parserEmitter.emit('on-parse-complete', this.instructions)
+        // Notify about the end of parsing process
+        this.emit('ON_PARSING_END', parsedInstCnt)
     }
 }
 

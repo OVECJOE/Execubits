@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import chalk from 'chalk'
-import { EbitsParser } from './lib/index.js'
+import { loadAudioFile, EbitsParser, BgAudioPlayer } from './lib/index.js'
 import { showErrMsgAndExit } from './utils.js'
 
 const CURRENT_WORKING_DIR = process.cwd()
@@ -43,26 +43,30 @@ const main = async (
         return args.length.toString(2)
     }
 
-    let script = args[0]
+    let scriptPath = args[0]
 
     // STEP 2: If the first argument does not end with .ebits, show a warning message
-    if (!script.endsWith('.ebits')) {
+    if (!scriptPath.endsWith('.ebits')) {
         console.warn(chalk.yellowBright('WARNING: The script file should end with .ebits extension'))
-        script += '.ebits'
+        scriptPath += '.ebits'
     }
 
     // STEP 3: If the script file does not exist, show an error message
     try {
-        const script_path = path.join(CURRENT_WORKING_DIR, script)
-        await fs.access(script_path, fs.constants.R_OK)
+        scriptPath = path.join(CURRENT_WORKING_DIR, scriptPath)
+        await fs.access(scriptPath, fs.constants.R_OK)
     } catch (error) {
         showErrMsgAndExit('ERROR: The script file does not exist')
     }
 
     // STEP 4: Parse the script and validate the instructions
-    new EbitsParser(script, (instructions) => {
-        console.log(instructions)
+    const parser = new EbitsParser(scriptPath, {
+        ON_TOKENISATION_END: () => loadAudioFile(2),
+        ON_PARSING_END: BgAudioPlayer.init,
     })
+
+    // Start the parsing process
+    await parser.init(scriptPath)
 
     // TODO: STEP 5: Read the audio file and start the device's audio player in the background
 }
