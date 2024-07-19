@@ -34,9 +34,7 @@ const generateUsage = async () => {
     return usage.join('\n')
 }
 
-const main = async (
-    args = process.argv.slice(2)
-) => {
+const main = async (args = process.argv.slice(2)) => {
     // STEP 1: If no arguments are provided, show the usage message
     if (args.length === 0) {
         console.info(chalk.cyan(await generateUsage()))
@@ -61,7 +59,7 @@ const main = async (
 
     // STEP 4: Parse the script and validate the instructions
     const parser = new EbitsParser(scriptPath, {
-        ON_TOKENISATION_END: () => loadAudioFile(2),
+        ON_TOKENISATION_END: () => loadAudioFile(args[1]), // STEP 5: Read the audio file
         ON_PARSING_END: BgAudioPlayer.init,
     })
 

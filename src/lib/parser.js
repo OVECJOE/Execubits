@@ -4,6 +4,7 @@ import EventEmitter from 'node:events'
 import { showErrMsgAndExit } from '../utils.js'
 import { INSTRUCTION_MAPPINGS } from '../constants.js'
 import { depsValidator, dataValidator } from './validators/index.js'
+import chalk from 'chalk'
 
 class EbitsParser extends EventEmitter {
     /**
@@ -77,10 +78,6 @@ class EbitsParser extends EventEmitter {
 
     get dependencies() {
         return this.#instructions.map(inst => INSTRUCTION_MAPPINGS.get(inst.code).dependencies)
-    }
-
-    get instructions() {
-        return this.#instructions
     }
 
     /**
@@ -193,8 +190,8 @@ class EbitsParser extends EventEmitter {
             parsedInstCnt++
         }
 
-        // Notify about the end of parsing process
-        this.emit('ON_PARSING_END', parsedInstCnt)
+        console.info(chalk.greenBright(`INFO: Successfully parsed ${parsedInstCnt} instructions`))
+        this.emit('ON_PARSING_END', this.#instructions) // Notify about the end of parsing process
     }
 }
 
