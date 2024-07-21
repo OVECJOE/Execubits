@@ -1,10 +1,9 @@
 import fs from 'node:fs/promises'
-import os, { type } from 'node:os'
+import os from 'node:os'
 import EventEmitter from 'node:events'
-import { showErrMsgAndExit } from '../utils.js'
+import { showErrMsgAndExit, showInfoMsg } from '../utils.js'
 import { INSTRUCTION_MAPPINGS } from '../constants.js'
 import { depsValidator, dataValidator } from './validators/index.js'
-import chalk from 'chalk'
 
 class EbitsParser extends EventEmitter {
     /**
@@ -53,14 +52,14 @@ class EbitsParser extends EventEmitter {
         super({ captureRejections: true })
 
         if (typeof path !== 'string') {
-            showErrMsgAndExit('ERROR: The script path should be a string')
+            showErrMsgAndExit('The script path should be a string')
         }
 
         // Register the events
         for (const [event, listener] of Object.entries(this.#events)) {
             if ([ 'ON_TOKENISATION_END', 'ON_PARSING_END' ].includes(event)) {
                 if (typeof listeners !== 'object' || typeof listeners[event] !== 'function') {
-                    showErrMsgAndExit(`ERROR: The listener for event ${event} should be a function`)
+                    showErrMsgAndExit(`The listener for event ${event} should be a function`)
                 }
 
                 if (typeof listeners === 'object' && typeof listeners[event] === 'function') {
@@ -92,17 +91,17 @@ class EbitsParser extends EventEmitter {
             // get the file size
             const stats = await this.#handler.stat()
             if (!stats.isFile()) {
-                showErrMsgAndExit('ERROR: The script path should point to a file')
+                showErrMsgAndExit('The script path should point to a file')
             }
 
             if (stats.size === 0) {
-                showErrMsgAndExit('ERROR: The script file is empty')
+                showErrMsgAndExit('The script file is empty')
             }
 
             // Start the tokenisation process
             this.emit('ON_TOKENISATION_START', stats.size)
         } catch (error) {
-            showErrMsgAndExit('ERROR: The script file does not exist')
+            showErrMsgAndExit('The script file does not exist')
         }
 
     }
@@ -131,7 +130,7 @@ class EbitsParser extends EventEmitter {
                 position += os.EOL.length - char.length
             } else if (/\s+?/.test(char)) {
                 if (!tracker.code && position !== scriptSize - 1) {
-                    showErrMsgAndExit(`ERROR: Invalid instruction at line ${tracker.line}`)
+                    showErrMsgAndExit(`Invalid instruction at line ${tracker.line}`)
                 }
     
                 tracker.data.push('')
@@ -166,31 +165,31 @@ class EbitsParser extends EventEmitter {
         let parsedInstCnt = 0
         for (const inst of this.#instructions) {
             if (!INSTRUCTION_MAPPINGS.has(inst.code)) {
-                showErrMsgAndExit(`ERROR: Invalid instruction at line ${inst.line}`)
+                showErrMsgAndExit(`Invalid instruction at line ${inst.line}`)
             }
 
             if (inst.data.length === 0 && !INSTRUCTION_MAPPINGS.get(inst.code).voidable) {
-                showErrMsgAndExit(`ERROR: No data provided for instruction at line ${inst.line}`)
+                showErrMsgAndExit(`No data provided for instruction at line ${inst.line}`)
             }
 
             if (inst.data.length > 0 && INSTRUCTION_MAPPINGS.get(inst.code).voidable) {
-                showErrMsgAndExit(`ERROR: No data should be provided for the instruction at line ${inst.line}`)
+                showErrMsgAndExit(`No data should be provided for the instruction at line ${inst.line}`)
             }
 
             // validate that the instruction was used correctly (i.e. dependencies are met)
             if (!depsValidator(this.#instructions.slice(0, parsedInstCnt), inst)) {
-                showErrMsgAndExit(`ERROR: Invalid instruction at line ${inst.line}`)
+                showErrMsgAndExit(`Invalid instruction at line ${inst.line}`)
             }
 
             // validate the instruction data
             if (!dataValidator(inst.code, inst.data)) {
-                showErrMsgAndExit(`ERROR: Invalid data for instruction at line ${inst.line}`)
+                showErrMsgAndExit(`Invalid data for instruction at line ${inst.line}`)
             }
 
             parsedInstCnt++
         }
 
-        console.info(chalk.greenBright(`INFO: Successfully parsed ${parsedInstCnt} instructions`))
+        showInfoMsg(`Successfully parsed ${parsedInstCnt} instructions`)
         this.emit('ON_PARSING_END', this.#instructions) // Notify about the end of parsing process
     }
 }

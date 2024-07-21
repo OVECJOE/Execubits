@@ -161,11 +161,11 @@ const INSTRUCTION_DEPS_VALIDATORS = {
 */
 export default function (prevInstructions, instruction) {
     if (!Array.isArray(prevInstructions)) {
-        showErrMsgAndExit('ERROR: The previous instructions should be an array')
+        showErrMsgAndExit('The previous instructions should be an array')
     }
 
    if (typeof instruction !== 'object' || Array.isArray(instruction)) {
-       showErrMsgAndExit('ERROR: The current instruction should be an object')
+       showErrMsgAndExit('The current instruction should be an object')
    }
 
    const dependencies = INSTRUCTION_DEPENDENCIES.get(instruction.code)
@@ -175,7 +175,7 @@ export default function (prevInstructions, instruction) {
 
    const validator = INSTRUCTION_DEPS_VALIDATORS[instruction.code]
    if (typeof validator !== 'function') {
-       showErrMsgAndExit('ERROR: The validator function is not defined')
+       showErrMsgAndExit('The validator function is not defined')
    }
 
    return validator.call(this, prevInstructions, dependencies)

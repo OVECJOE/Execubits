@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import chalk from 'chalk'
-import { loadAudioFile, EbitsParser, BgAudioPlayer } from './lib/index.js'
-import { showErrMsgAndExit } from './utils.js'
+import { AudioManager, EbitsParser } from './lib/index.js'
+import { showErrMsgAndExit, showWarningMsg } from './utils.js'
+import store from './store.js'
 
 const CURRENT_WORKING_DIR = process.cwd()
 
@@ -45,7 +46,7 @@ const main = async (args = process.argv.slice(2)) => {
 
     // STEP 2: If the first argument does not end with .ebits, show a warning message
     if (!scriptPath.endsWith('.ebits')) {
-        console.warn(chalk.yellowBright('WARNING: The script file should end with .ebits extension'))
+        showWarningMsg('The script file should end with .ebits extension')
         scriptPath += '.ebits'
     }
 
@@ -54,19 +55,24 @@ const main = async (args = process.argv.slice(2)) => {
         scriptPath = path.join(CURRENT_WORKING_DIR, scriptPath)
         await fs.access(scriptPath, fs.constants.R_OK)
     } catch (error) {
-        showErrMsgAndExit('ERROR: The script file does not exist')
+        showErrMsgAndExit('The script file does not exist')
     }
 
     // STEP 4: Parse the script and validate the instructions
+    const audioManager = new AudioManager(args[1])
     const parser = new EbitsParser(scriptPath, {
-        ON_TOKENISATION_END: () => loadAudioFile(args[1]), // STEP 5: Read the audio file
-        ON_PARSING_END: BgAudioPlayer.init,
+        ON_TOKENISATION_END: () => audioManager.init(),
+        ON_PARSING_END: (instructions) => {
+            console.log(instructions)
+            console.log(store.get())
+        }
     })
 
     // Start the parsing process
     await parser.init(scriptPath)
 
-    // TODO: STEP 5: Read the audio file and start the device's audio player in the background
+    // TODO: STEP 5: Maniuplate the audio stream based on the instructions
+    // TODO: STEP 6: Play the updated audio stream
 }
 
 main().then((returnCode) => {
