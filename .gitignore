@@ -131,3 +131,4 @@ dist
 
 # Execubits
 *.ebits
+!samples/sample.ebits

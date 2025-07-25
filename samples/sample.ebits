@@ -1,0 +1,18 @@
+# Execubits Sample Script
+# This script demonstrates playback, volume, speed, seeking, repeat, and halt.
+
+1111         # PLAY (play the first chunk of the first audio)
+0001 1s      # DELAY 1 second
+0011         # VOLUME_UP
+1111         # PLAY (louder)
+0101         # SPEED_UP
+1111         # PLAY (faster)
+0010 2       # FORWARD 2 seconds
+1111         # PLAY (from new position)
+1100         # VOLUME_DOWN
+1111         # PLAY (quieter)
+1011 00:05   # JUMP to 5 seconds
+1111         # PLAY (from 5s)
+0100 2       # REPEAT audio chunk 2 times
+1111         # PLAY (repeated audio)
+0000         # HALT
