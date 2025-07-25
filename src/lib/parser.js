@@ -120,7 +120,9 @@ class EbitsParser extends EventEmitter {
             const char = buffer.toString('utf8', 0, 1);
 
             if (os.EOL.includes(char)) {
-                this.#instructions.push({ ...tracker })
+                if (tracker.code.trim()) {
+                    this.#instructions.push({ ...tracker, data: tracker.data.filter(d => d.trim()) })
+                }
                 // Reset the tracker
                 tracker.line++
                 tracker.code = ''
@@ -135,13 +137,31 @@ class EbitsParser extends EventEmitter {
     
                 tracker.data.push('')
             } else {
+                // Handle comments
+                if (char === '#' || (char === '/' && buffer.toString('utf8', 0, 1) === '/')) {
+                    // Find next newline
+                    let skipPos = position
+                    let foundEOL = false
+                    while (skipPos < scriptSize) {
+                        await this.#handler.read(buffer, 0, buffer.byteLength, skipPos)
+                        const skipChar = buffer.toString('utf8', 0, 1)
+                        if (os.EOL.includes(skipChar)) {
+                            foundEOL = true
+                            break
+                        }
+                        skipPos++
+                    }
+                    position = foundEOL ? skipPos : scriptSize
+                    continue
+                }
+
+                // Handle instruction code
                 if (tracker.code.length < 4) {
                     tracker.code += char
                 } else {
                     if (tracker.data.length === 0) {
                         tracker.data.push('')
                     }
-
                     tracker.data[tracker.data.length - 1] += char
                 }
             }
@@ -150,7 +170,7 @@ class EbitsParser extends EventEmitter {
         }
 
         // Check if the last instruction is complete
-        if (tracker.code) {
+        if (tracker.code.trim()) {
             this.#instructions.push({ ...tracker })
         }
 
@@ -178,6 +198,7 @@ class EbitsParser extends EventEmitter {
 
             // validate that the instruction was used correctly (i.e. dependencies are met)
             if (!depsValidator(this.#instructions.slice(0, parsedInstCnt), inst)) {
+                console.log(this.#instructions.slice(0, parsedInstCnt), inst)
                 showErrMsgAndExit(`Invalid instruction at line ${inst.line}`)
             }
 

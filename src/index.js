@@ -4,6 +4,7 @@ import chalk from 'chalk'
 import { AudioManager, EbitsParser } from './lib/index.js'
 import { showErrMsgAndExit, showWarningMsg } from './utils.js'
 import store from './store.js'
+import { executeInstructions } from './lib/executor.js'
 
 const CURRENT_WORKING_DIR = process.cwd()
 
@@ -35,44 +36,64 @@ const generateUsage = async () => {
     return usage.join('\n')
 }
 
-const main = async (args = process.argv.slice(2)) => {
-    // STEP 1: If no arguments are provided, show the usage message
-    if (args.length === 0) {
-        console.info(chalk.cyan(await generateUsage()))
-        return args.length.toString(2)
+const parseArgs = (args) => {
+    const options = {
+        audioFile: null,
+        watchMode: 'none',
     }
+    let script = null
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i]
+        if (arg === '-a' || arg === '--audio-file') {
+            options.audioFile = args[++i]
+        } else if (arg === '-w' || arg === '--watch-mode') {
+            options.watchMode = args[++i]
+        } else if (!script && arg.endsWith('.ebits')) {
+            script = arg
+        } else if (!script && !arg.startsWith('-')) {
+            script = arg
+        }
+    }
+    if (options.audioFile && !options.audioFile.endsWith('.wav')) {
+        options.audioFile += '.wav'
+    }
+    return { script, options }
+}
 
-    let scriptPath = args[0]
-
-    // STEP 2: If the first argument does not end with .ebits, show a warning message
+const main = async (args = process.argv.slice(2)) => {
+    const { script, options } = parseArgs(args)
+    if (!script) {
+        console.info(chalk.cyan(await generateUsage()))
+        return '0'
+    }
+    let scriptPath = script
     if (!scriptPath.endsWith('.ebits')) {
         showWarningMsg('The script file should end with .ebits extension')
         scriptPath += '.ebits'
     }
-
-    // STEP 3: If the script file does not exist, show an error message
     try {
         scriptPath = path.join(CURRENT_WORKING_DIR, scriptPath)
         await fs.access(scriptPath, fs.constants.R_OK)
     } catch (error) {
         showErrMsgAndExit('The script file does not exist')
     }
-
-    // STEP 4: Parse the script and validate the instructions
-    const audioManager = new AudioManager(args[1])
+    const audioPath = options.audioFile || args[1]
+    if (!audioPath) {
+        showErrMsgAndExit('No audio file provided. Use -a <audio.wav> or provide as second argument.')
+    }
+    const audioManager = new AudioManager(audioPath)
     const parser = new EbitsParser(scriptPath, {
         ON_TOKENISATION_END: () => audioManager.init(),
-        ON_PARSING_END: (instructions) => {
+        ON_PARSING_END: async (instructions) => {
+            store.update('instructions', instructions)
             console.log(instructions)
-            console.log(store.get())
+            if (!instructions.length) {
+                showErrMsgAndExit('No instructions found in the script.')
+            }
+            await executeInstructions(instructions)
         }
     })
-
-    // Start the parsing process
     await parser.init(scriptPath)
-
-    // TODO: STEP 5: Maniuplate the audio stream based on the instructions
-    // TODO: STEP 6: Play the updated audio stream
 }
 
 main().then((returnCode) => {
